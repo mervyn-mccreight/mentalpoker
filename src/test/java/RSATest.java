@@ -1,13 +1,19 @@
+import org.bouncycastle.crypto.AsymmetricCipherKeyPair;
 import org.bouncycastle.crypto.engines.RSAEngine;
+import org.bouncycastle.crypto.generators.RSAKeyPairGenerator;
+import org.bouncycastle.crypto.params.RSAKeyGenerationParameters;
 import org.bouncycastle.crypto.util.PrivateKeyFactory;
 import org.bouncycastle.crypto.util.PublicKeyFactory;
 import org.bouncycastle.jce.provider.BouncyCastleProvider;
+import org.bouncycastle.util.encoders.Hex;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 
+import java.math.BigInteger;
 import java.security.KeyPair;
 import java.security.KeyPairGenerator;
+import java.security.SecureRandom;
 import java.security.Security;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -26,9 +32,9 @@ public class RSATest {
     }
 
     @Test
-    public void encrypt_decrypt() throws Exception {
-        String message = "This is very private.";
-        System.out.println("plain: " + message);
+    public void encrypt_decrypt_jce() throws Exception {
+        String plain = "This is very private.";
+        System.out.println("plain: " + plain);
 
         KeyPairGenerator generator = KeyPairGenerator.getInstance("RSA", BouncyCastleProvider.PROVIDER_NAME);
         generator.initialize(KEY_SIZE_IN_BITS);
@@ -38,23 +44,42 @@ public class RSATest {
 
         rsa.init(true, PublicKeyFactory.createKey(keyPair.getPublic().getEncoded()));
 
-        byte[] cipher = rsa.processBlock(message.getBytes(), 0, message.getBytes().length);
-        System.out.println("cipher: " + getHexString(cipher));
+        byte[] cipher = rsa.processBlock(plain.getBytes(), 0, plain.getBytes().length);
+        System.out.println("cipher: " + Hex.toHexString(cipher));
 
         rsa.init(false, PrivateKeyFactory.createKey(keyPair.getPrivate().getEncoded()));
 
         byte[] decrypted = rsa.processBlock(cipher, 0, cipher.length);
-        System.out.println("encryption: " + new String(decrypted));
+        String encryptionString = new String(decrypted);
+        System.out.println("encryption: " + encryptionString);
 
-        assertThat(new String(decrypted)).isEqualTo(message);
+        assertThat(encryptionString).isEqualTo(plain);
     }
 
+    @Test
+    public void encrypt_decrypt_bcintern() throws Exception {
+        String plain = "This is really private using plain bc.";
+        System.out.println("plain: " + plain);
 
-    private static String getHexString(byte[] b) throws Exception {
-        String result = "";
-        for (byte aB : b) {
-            result += Integer.toString((aB & 0xff) + 0x100, 16).substring(1);
-        }
-        return result;
+        RSAKeyPairGenerator generator = new RSAKeyPairGenerator();
+        BigInteger publicExponent = BigInteger.valueOf(3);
+        RSAKeyGenerationParameters parameters = new RSAKeyGenerationParameters(publicExponent, SecureRandom.getInstanceStrong(), KEY_SIZE_IN_BITS, 80);
+        generator.init(parameters);
+
+        AsymmetricCipherKeyPair keyPair = generator.generateKeyPair();
+
+        RSAEngine rsa = new RSAEngine();
+
+        rsa.init(true, keyPair.getPublic());
+        byte[] cipher = rsa.processBlock(plain.getBytes(), 0, plain.getBytes().length);
+        System.out.println("cipher: " + Hex.toHexString(cipher));
+
+        rsa.init(false, keyPair.getPrivate());
+        byte[] decrypted = rsa.processBlock(cipher, 0, cipher.length);
+
+        String decriptionString = new String(decrypted);
+        System.out.println("encryption: " + decriptionString);
+
+        assertThat(decriptionString).isEqualTo(plain);
     }
 }
