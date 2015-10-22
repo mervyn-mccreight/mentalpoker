@@ -63,7 +63,8 @@ public class RSATest {
 
         RSAKeyPairGenerator generator = new RSAKeyPairGenerator();
         BigInteger publicExponent = BigInteger.valueOf(3);
-        RSAKeyGenerationParameters parameters = new RSAKeyGenerationParameters(publicExponent, SecureRandom.getInstanceStrong(), KEY_SIZE_IN_BITS, 80);
+				SecureRandom prng = SecureRandom.getInstance("SHA1PRNG", "SUN");
+        RSAKeyGenerationParameters parameters = new RSAKeyGenerationParameters(publicExponent, prng, KEY_SIZE_IN_BITS, 80);
         generator.init(parameters);
 
         AsymmetricCipherKeyPair keyPair = generator.generateKeyPair();
