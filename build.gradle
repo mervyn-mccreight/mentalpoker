@@ -11,7 +11,7 @@ repositories {
 }
 
 dependencies {
-		compile 'com.github.mervyn-mccreight:bc-java:r1rv54_mm'
+	compile 'com.github.mervyn-mccreight:bc-java:r1rv55_mm'
     testCompile 'org.assertj:assertj-core:2.2.0'
     testCompile group: 'junit', name: 'junit', version: '4.11'
 }
