@@ -22,7 +22,7 @@ public class CoinFlipTest {
     }
 
     @Test
-    public void cleanBob_aliceVerificationIsTrue() throws Exception {
+    public void cleanBob_aliceVerificationIsTrue_verificationsByKeyPairAreTrue() throws Exception {
         CoinFlipClient alice = new CoinFlipClient(random);
         CoinFlipClient bob = new CoinFlipClient(random);
 
@@ -35,8 +35,10 @@ public class CoinFlipTest {
         String aliceEncodedPick = alice.decodePick(bobsPick);
         String coinFlipResult = bob.decodePick(aliceEncodedPick);
 
-        System.out.println("CoinFlip Result is: " + new String(Hex.decode(bob.decodePick(aliceEncodedPick))));
+        System.out.println("CoinFlip Result is: " + new String(Hex.decode(coinFlipResult)));
         System.out.println("Alice random string verification: " + alice.verify(coinFlipResult));
+        System.out.println("Alice Verification with Bobs Keypair: " + alice.verifyByKeyPair(bob.revealKeyPair()));
+        System.out.println("Bob Verification with Alice' Keypair: " + bob.verifyByKeyPair(alice.revealKeyPair()));
 
         assertThat(alice.verify(coinFlipResult)).isTrue();
         assertThat(alice.verifyByKeyPair(bob.revealKeyPair())).isTrue();

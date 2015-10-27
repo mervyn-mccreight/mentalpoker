@@ -63,8 +63,11 @@ public class CoinFlipClient {
     public String pick(List<String> coin) {
         this.engine.init(true, keyPair.getPublic());
         byte[] pick = Hex.decode(coin.get(0));
+        String pickString = Hex.toHexString(this.engine.processBlock(pick, 0, pick.length));
 
-        return Hex.toHexString(this.engine.processBlock(pick, 0, pick.length));
+        this.log.add(pickString);
+
+        return pickString;
     }
 
     public String decodePick(String pick) {
@@ -84,8 +87,41 @@ public class CoinFlipClient {
         return s.equals(this.heads) || s.equals(this.tails);
     }
 
-    public boolean verifyByKeyPair(AsymmetricCipherKeyPair keyPair) {
-        return true;
+    public boolean verifyByKeyPair(AsymmetricCipherKeyPair other) {
+        if (!this.flipper) {
+            // der alice-fall
+
+            // ich entschlüssele mit bobs private key und meinem private key
+            // die von bob empfangene nachricht, und die muss eine von meinen sein.
+            this.engine.init(false, other.getPrivate());
+            byte[] data = Hex.decode(log.get(0));
+            byte[] bobdecrypted = this.engine.processBlock(data, 0, data.length);
+            this.engine.init(false, keyPair.getPrivate());
+            byte[] finalDecrypted = this.engine.processBlock(bobdecrypted, 0, bobdecrypted.length);
+            String s = new String(finalDecrypted);
+
+            boolean check1 =  s.equals(this.heads) || s.equals(this.tails);
+
+            // alice kann außerdem auch prüfen, ob das, was bob ihr im ersten schritt
+            // gesendet hat, entschlüsselt mit seinem private key,
+            // überhaupt einer der verschlüsselungen von head oder tail entspricht.
+
+            return check1;
+        }
+
+        // bob kann seinen verschlüsselten pick mit alice private key entschlüsseln und schauen
+        // ob das, was dabei heraus kommt wirklich das ist, was alice ihm zum entschlüsseln für das
+        // finale ergebnis geschickt hat.
+
+        String myPick = log.get(0);
+        String aliceDecipherOfMyPick = log.get(1);
+
+        byte[] decode = Hex.decode(myPick);
+        this.engine.init(false, other.getPrivate());
+        byte[] block = this.engine.processBlock(decode, 0, decode.length);
+        String referral = Hex.toHexString(block);
+
+        return referral.equals(aliceDecipherOfMyPick);
     }
 
     public AsymmetricCipherKeyPair revealKeyPair() {
