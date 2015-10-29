@@ -5,6 +5,7 @@ import generator.RandomStringGenerator;
 import org.bouncycastle.crypto.AsymmetricCipherKeyPair;
 import org.bouncycastle.crypto.engines.SRAEngine;
 import org.bouncycastle.crypto.generators.SRAKeyPairGenerator;
+import org.bouncycastle.util.Arrays;
 import org.bouncycastle.util.encoders.Hex;
 
 import java.math.BigInteger;
@@ -91,6 +92,7 @@ public class CoinFlipClient {
     }
 
     public boolean verify(String result) {
+        this.aliceTest.bobFinalResult = result;
         byte[] decode = Hex.decode(result);
         String s = new String(decode);
         return s.equals(this.heads) || s.equals(this.tails);
@@ -115,7 +117,16 @@ public class CoinFlipClient {
             // Alice muss prüfen, ob das, was sie im letzten Schritt (zur Verifizierung des RandomStrings)
             // von Bob bekommt dem entspricht, was sie von Bob verschlüsselt als Pick im ersten Schritt
             // bekommen hat.
-            return check1;
+            this.engine.init(false, other.getPrivate());
+            byte[] coinResult = Hex.decode(this.aliceTest.bobFinalResult);
+            byte[] bobPick = Hex.decode(this.aliceTest.bobEncryptedPick);
+            byte[] bobPickDecrypted = this.engine.processBlock(bobPick, 0, bobPick.length);
+            this.engine.init(false, keyPair.getPrivate());
+            byte[] bobPickPlain = this.engine.processBlock(bobPickDecrypted, 0, bobPickDecrypted.length);
+
+            boolean check2 = Arrays.areEqual(bobPickPlain, coinResult);
+
+            return check1 && check2;
         }
         // der bob fall
 
@@ -126,8 +137,26 @@ public class CoinFlipClient {
         this.engine.init(false, other.getPrivate());
         byte[] block = this.engine.processBlock(decode, 0, decode.length);
         String referral = Hex.toHexString(block);
+        boolean check1 = referral.equals(this.bobTest.aliceDecryption);
 
-        return referral.equals(this.bobTest.aliceDecryption);
+        // bob prüft, ob in der anfänglichen coin liste wirklich zwei unterschiedliche
+        // ergebnisse zu erreichen waren. also dass alice keine schummelmünze verwendet.
+        this.engine.init(false, other.getPrivate());
+        byte[] coin1 = Hex.decode(this.bobTest.aliceCoin.get(0));
+        byte[] coin2 = Hex.decode(this.bobTest.aliceCoin.get(1));
+
+        byte[] coin1_decrypt = this.engine.processBlock(coin1, 0, coin1.length);
+        byte[] coin2_decrypt = this.engine.processBlock(coin2, 0, coin2.length);
+
+        String coin1_string = new String(coin1_decrypt);
+        String coin2_string = new String(coin2_decrypt);
+
+        String coin1_plain = coin1_string.split(DELIMITER)[0];
+        String coin2_plain = coin2_string.split(DELIMITER)[0];
+
+        boolean check2 = !coin1_plain.equals(coin2_plain);
+
+        return check1 && check2;
     }
 
     public AsymmetricCipherKeyPair revealKeyPair() {
