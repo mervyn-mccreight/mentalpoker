@@ -19,8 +19,6 @@ public class CoinFlipClient {
     private static final String DELIMITER = "_";
     private static final int CERTAINTY = 80;
 
-    private List<String> log = Lists.newArrayList();
-
     private final SecureRandom random;
 
     private RandomStringGenerator generator;
@@ -30,6 +28,9 @@ public class CoinFlipClient {
 
     private SRAEngine engine;
     private AsymmetricCipherKeyPair keyPair;
+
+    private AliceTestParameters aliceTest = null;
+    private BobTestParameters bobTest = null;
 
     public CoinFlipClient(SecureRandom random) {
         this.random = random;
@@ -48,6 +49,8 @@ public class CoinFlipClient {
 
     public List<String> coin() {
         this.flipper = false;
+        this.aliceTest = new AliceTestParameters();
+
         this.engine.init(true, keyPair.getPublic());
 
         String headsDecrypt = Hex.toHexString(this.engine.processBlock(this.heads.getBytes(), 0, this.heads.getBytes().length));
@@ -61,11 +64,13 @@ public class CoinFlipClient {
 
     //TODO: Stupid client, as he always picks the first input for now.
     public String pick(List<String> coin) {
+        this.bobTest = new BobTestParameters();
         this.engine.init(true, keyPair.getPublic());
         byte[] pick = Hex.decode(coin.get(0));
         String pickString = Hex.toHexString(this.engine.processBlock(pick, 0, pick.length));
 
-        this.log.add(pickString);
+        this.bobTest.bobsPick = pickString;
+        this.bobTest.aliceCoin = Lists.newArrayList(coin);
 
         return pickString;
     }
@@ -76,7 +81,11 @@ public class CoinFlipClient {
         byte[] decode = Hex.decode(pick);
         byte[] decodedPick = this.engine.processBlock(decode, 0, decode.length);
 
-        this.log.add(pick);
+        if (this.flipper) {
+            this.bobTest.aliceDecryption = pick;
+        } else {
+            this.aliceTest.bobEncryptedPick = pick;
+        }
 
         return Hex.toHexString(decodedPick);
     }
@@ -94,40 +103,45 @@ public class CoinFlipClient {
             // ich entschlüssele mit bobs private key und meinem private key
             // die von bob empfangene nachricht, und die muss eine von meinen sein.
             this.engine.init(false, other.getPrivate());
-            byte[] data = Hex.decode(log.get(0));
+            byte[] data = Hex.decode(this.aliceTest.bobEncryptedPick);
             byte[] bobdecrypted = this.engine.processBlock(data, 0, data.length);
+
             this.engine.init(false, keyPair.getPrivate());
             byte[] finalDecrypted = this.engine.processBlock(bobdecrypted, 0, bobdecrypted.length);
             String s = new String(finalDecrypted);
 
             boolean check1 =  s.equals(this.heads) || s.equals(this.tails);
 
-            // alice kann außerdem auch prüfen, ob das, was bob ihr im ersten schritt
-            // gesendet hat, entschlüsselt mit seinem private key,
-            // überhaupt einer der verschlüsselungen von head oder tail entspricht.
-
-						// Alice muss prüfen, ob das, was sie im letzten Schritt (zur Verifizierung des RandomStrings)
-						// von Bob bekommt dem entspricht, was sie von Bob verschlüsselt als Pick im ersten Schritt
-						// bekommen hat.
+            // Alice muss prüfen, ob das, was sie im letzten Schritt (zur Verifizierung des RandomStrings)
+            // von Bob bekommt dem entspricht, was sie von Bob verschlüsselt als Pick im ersten Schritt
+            // bekommen hat.
             return check1;
         }
+        // der bob fall
 
         // bob kann seinen verschlüsselten pick mit alice private key entschlüsseln und schauen
         // ob das, was dabei heraus kommt wirklich das ist, was alice ihm zum entschlüsseln für das
         // finale ergebnis geschickt hat.
-
-        String myPick = log.get(0);
-        String aliceDecipherOfMyPick = log.get(1);
-
-        byte[] decode = Hex.decode(myPick);
+        byte[] decode = Hex.decode(this.bobTest.bobsPick);
         this.engine.init(false, other.getPrivate());
         byte[] block = this.engine.processBlock(decode, 0, decode.length);
         String referral = Hex.toHexString(block);
 
-        return referral.equals(aliceDecipherOfMyPick);
+        return referral.equals(this.bobTest.aliceDecryption);
     }
 
     public AsymmetricCipherKeyPair revealKeyPair() {
         return keyPair;
+    }
+
+    private class AliceTestParameters {
+        private String bobFinalResult;
+        private String bobEncryptedPick;
+    }
+
+    private class BobTestParameters {
+        private String bobsPick;
+        private String aliceDecryption;
+        private List<String> aliceCoin;
     }
 }
