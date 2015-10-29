@@ -106,6 +106,9 @@ public class CoinFlipClient {
             // gesendet hat, entschlüsselt mit seinem private key,
             // überhaupt einer der verschlüsselungen von head oder tail entspricht.
 
+						// Alice muss prüfen, ob das, was sie im letzten Schritt (zur Verifizierung des RandomStrings)
+						// von Bob bekommt dem entspricht, was sie von Bob verschlüsselt als Pick im ersten Schritt
+						// bekommen hat.
             return check1;
         }
 
